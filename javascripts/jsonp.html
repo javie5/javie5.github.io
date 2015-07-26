@@ -183,7 +183,9 @@
         //reconnect：成功重连
         //reconnecting：正在重连
         //当第一次连接时，事件触发顺序为：connecting->connect；当失去连接时，事件触发顺序为：disconnect->reconnecting（可能进行多次）->connecting->reconnect->connect。
-        var socket = io.connect('http://192.168.1.110:3000');
+        // var socket = io.connect('http://192.168.1.110:3000');
+        var socket = io.connect('http://nojw.wicp.net:41361');
+      
         socket.on('connect', function (data) {
             console.log('[connect]:', data, socket.id);
 
