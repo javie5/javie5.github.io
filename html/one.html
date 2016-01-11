@@ -1,1 +1,356 @@
 
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=600;  user-scalable=no;">
+    <title>webrtc Demo</title>
+
+</head>
+<style>
+    .left {
+        float: left;
+    }
+    
+    .right {
+        float: right;
+    }
+    
+    .clear {
+        clear: both;
+    }
+    
+    .over-auto {
+        overflow: auto;
+    }
+    
+    .menu-box {
+        width: 300px;
+        overflow: auto;
+    }
+    
+    .context-box {
+        overflow: auto;
+    }
+    
+    .li-user {
+        padding: 5px;
+        /*        background: #456;*/
+    }
+    
+    #info {
+        max-height: 100px;
+        overflow: auto;
+    }
+
+</style>
+<script>
+    ////--------------//
+    function getQueryString(name) { ///获取当前页面参数
+        //            console.log('1=================', location.search, location.hash, location.hash.substr(0, 8));
+        try {
+            if (!name) {
+                return window.location.search;
+            }
+            var reg = new RegExp("(^|&)" + name + "=([^&]*)(&|$)", "i");
+            var r = window.location.search.substr(1).match(reg);
+            if (r != null)
+                return unescape(r[2]);
+            return null;
+        } catch (e) {
+            if (undefined != typeof(console) && console.log)
+                console.log(' getQueryString(name) 获取当前页面参数 [错误]:', e);
+            return null;
+        }
+
+    }
+
+    function obj2str(o) { //对象转字符串
+        var r = [];
+        if (typeof o == "string" || o == null) {
+            return o;
+        }
+        if (typeof o == "object") {
+            if (!o.sort) {
+                r[0] = "{"
+                for (var i in o) {
+                    r[r.length] = i;
+                    r[r.length] = ":";
+                    r[r.length] = obj2str(o[i]);
+                    r[r.length] = ",";
+                }
+                r[r.length - 1] = "}"
+            } else {
+                r[0] = "["
+                for (var i = 0; i < o.length; i++) {
+                    r[r.length] = obj2str(o[i]);
+                    r[r.length] = ",";
+                }
+                r[r.length - 1] = "]"
+            }
+            return r.join("");
+        }
+        return o.toString();
+    }
+
+    function info(obj, elementId) { //打印信息
+        var el = document.getElementById(elementId);
+        if (el) {
+            el.innerHTML += obj2str(obj);
+        } else {
+            document.body.appendChild(obj2str(obj));
+            console.log(obj);
+        }
+    }
+    var room = getQueryString("room");
+    var user = window.location.href.split('#')[1];
+    var isCaller = window.location.href.split('#')[1];
+
+    console.log(window.location);
+
+</script>
+
+<body>
+    <div>
+        <div class="menu-box right">
+            <fieldset>
+                <legend>用户列表:</legend>
+                <option id="userMe"></option>
+                <hr>
+                <ul id="usersMenu">
+                    <li class="li-user" value="=9">w</li>
+                </ul>
+            </fieldset>
+        </div>
+        <div class="context-box">
+            <div id='info'>--1--</div>
+            <fieldset id="local">
+                <legend>本地:</legend>
+                <video id="localVideo" controls autoplay style="background-color:rgba(0,0,0,0.1) ;height:200px;"></video>
+
+            </fieldset>
+            <fieldset id="remote">
+                <legend>远程:</legend>
+
+            </fieldset>
+        </div>
+    </div>
+    <script src="./socket.io.js"></script>
+    <script src="./CRTC.js"></script>
+    <script src="./CPC.js"></script>
+    <script>
+        var getUserMedia = (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia);
+        var PeerConnection = (window.PeerConnection || window.webkitPeerConnection00 || window.webkitRTCPeerConnection || window.mozRTCPeerConnection);
+        var iceServer = {
+            "iceServers": [{
+                "url": "stun:stun.l.google.com:19302"
+            }, {
+                "url": "turn:numb.viagenie.ca",
+                "username": "webrtc@live.com",
+                "credential": "muazkh"
+            }]
+        };
+        var pcs = [];
+
+        function offer(el) {
+
+            var socketId = el.getAttribute("value");
+            console.log(el, socketId);
+            if (socketId) {
+                if (!pcs[socketId]) {
+                    pcs[socketId] = new CPC(iceServer, socketId, "remote");
+                }
+                if (pcs[socketId]) {
+                    pcs[socketId].addStream(mediaStream);
+                    pcs[socketId].sendOffer(socket, socketId);
+
+                }
+
+            } else {}
+        }
+
+        function sendOffer(toId) {
+            if (pc && pc.createOffer) {
+                var obj = {
+                    type: "private",
+                    from: socket.id,
+                    to: toId
+                };
+                var offer = function(desc) {
+                    pc.setLocalDescription(desc);
+                    socket.emit('message', JSON.stringify({
+                        "event": "_offer",
+                        "data": {
+                            "sdp": desc
+                        }
+                    }), obj);
+                };
+                pc.createOffer(offer, function(error) {
+                    console.log('[pc.createOffer Failure ]: ', error);
+                });
+            } else {
+                console.log(pc);
+            }
+        }
+
+        function sendAnswer(pc, toId) {
+            if (pc && pc.createAnswer) {
+                var obj = {
+                    type: "private",
+                    from: socket.id,
+                    to: toId
+                };
+                var answer = function(desc) {
+                    pc.setLocalDescription(desc);
+                    socket.emit('message', JSON.stringify({
+                        "event": "_answer",
+                        "data": {
+                            "sdp": desc
+                        }
+                    }), obj);
+                };
+                pc.createAnswer(sendOfferFn, function(error) {
+                    console.log('Failure callback: ' + error);
+                });
+            } else {}
+        }
+
+        var localVideo = document.getElementById('localVideo');
+        var mediaStream;
+        /////////////////
+        // 仅仅用于控制哪一端的浏览器发起offer，#号后面有值的一方发起
+
+        // 获取本地音频和视频流
+        if (getUserMedia) {
+            getUserMedia.call(navigator, {
+                    //        navigator.webkitGetUserMedia({
+                    "audio": true,
+                    "video": true
+                }, function(stream) {
+                    //绑定本地媒体流到video标签用于输出
+
+                    try {
+                        localVideo.src = window.URL && window.URL.createObjectURL(stream) || stream;
+                    } catch (e) {
+                        alert('[ localVideo.src错误]' + e);
+                    }
+
+                    localVideo.addEventListener('play', function() {
+
+                    }, false);
+                    mediaStream = stream;
+                },
+                function(error) {
+                    //处理媒体流创建失败错误
+                    info(error, 'info');
+                    alert(error);
+                    console.log('getUserMedia error: ' + error);
+                });
+        } else {
+            alert("不支持 getUserMedia");
+        }
+
+    </script>
+    <script>
+        var cRtc = new CRTC();
+        var socket = io.connect("http://172.16.11.208:3004");
+        //  var socket1 = io.connect("http://120.24.254.22:3005");
+        function setusers(sockets) {
+            var socketIdMe = document.getElementById("userMe").value;
+            var usersMenu = document.getElementById("usersMenu");
+            var mHtml = "";
+            for (var i in sockets) {
+                //                console.log(i);
+                if (i == socketIdMe) {
+                    continue;
+                } else {
+                    mHtml += " <li class=li-user value=" + i + " onclick=offer(this)>" + i + "</li>";
+                }
+            }
+            usersMenu.innerHTML = mHtml;
+        }
+
+        socket.on('connect', function() {
+            var el = document.getElementById("userMe");
+            el.value = socket.id;
+            el.innerHTML = "我:" + socket.id;
+            console.log('connect', socket);
+        });
+        socket.on('disconnect', function() {
+            var el = document.getElementById("userMe");
+            el.value = socket.id;
+            el.innerHTML = "我:" + socket.id;
+            console.log('disconnect', socket);
+        });
+        //处理到来的信令
+        socket.on('sys', function(data, mCallback) {
+            console.log('on sys: ', data, mCallback);
+            setusers(data.sockets);
+
+        });
+
+        //处理到来的信令
+        socket.on('message', function(event, obj) {
+            console.log('onmessage: ');
+            var json = JSON.parse(event);
+            console.log('onmessage: ', json, obj);
+            if (obj && obj.from) {
+                if (!pcs[obj.from]) {
+                    pcs[obj.from] = new CPC(iceServer, obj.from, "remote");
+                }
+                if (pcs[obj.from]) {
+                    if (json.event === "_ice_candidate") {
+                        pcs[obj.from].pc.addIceCandidate(new RTCIceCandidate(json.data.candidate));
+                    } else {
+                        pcs[obj.from].pc.setRemoteDescription(new RTCSessionDescription(json.data.sdp));
+                        if (json.event === "_offer") {
+                            pcs[obj.from].addStream(mediaStream);
+                            pcs[obj.from].sendAnswer(socket, obj.from);
+                        }
+                    }
+                } else {
+                    console.log("[空异常]:", pcs[obj.from]);
+                    pcs[obj.from] = null;
+                    delete pcs[obj.from];
+                }
+
+            } else {
+                if (json.event === "_ice_candidate") {
+                    //如果是一个ICE的候选，则将其加入到PeerConnection中，否则设定对方的session描述为传递过来的描述
+                    pc.addIceCandidate(new RTCIceCandidate(json.data.candidate));
+
+                } else {
+                    pcs[obj.from].pc.setRemoteDescription(new RTCSessionDescription(json.data.sdp));
+                    // 如果是一个offer，那么需要回复一个answer
+                    if (json.event === "_offer") {
+
+                        pc.setRemoteDescription(new RTCSessionDescription(json.data.sdp));
+                        sendAnswer(pc, socket.id);
+                        pc.createAnswer(sendAnswerFn, function(error) {
+                            console.log('Failure callback: ' + error);
+                        });
+                    }
+                }
+            }
+
+        });
+    
+        function tt(name){
+            var _self=this;
+            this.a="eee";
+            this.name=name;
+            this.getname=function(){
+                return _self.name;
+            }
+            return this;
+        }
+        var b=new tt(120);
+        console.log(b,b.a,b.name);
+        
+        
+    </script>
+</body>
+
+
+</html>
