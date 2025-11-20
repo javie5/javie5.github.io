@@ -181,7 +181,7 @@ function save() {
   </div>
 </body>
 <script id="doc" type="text/template">${we.getHtml()}</script>
-<script src="./https://javie5.github.io/wangEditor/index.js"></script>
+<script src="https://javie5.github.io/wangEditor/index.js"></script>
 </html>
 `;
   let name = document.querySelector(`.nav .filename`).value || "index.html";
