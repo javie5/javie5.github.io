@@ -28,6 +28,7 @@ window.onload = function () {
     config: { excludeKeys: ["lineHeight"] }
   });
   document.querySelector(`.nav .filename`).value = decodeURI(location.pathname.substring(location.pathname.lastIndexOf("/") + 1));
+  document.querySelector(`title`).innerText = document.querySelector(`.nav .filename`).value;
 };
 
 function docAnchor() {
@@ -76,7 +77,7 @@ var db = {
       store.onerror = (event) => {
         console.log("[数据保存 onerror]");
       };
-      let id = `${location.origin}${location.pathname}`;
+      let id = decodeURI(`${location.origin}${location.pathname}`);
       var getRequest = store.get(id); // key 是你要检索的对象的键
       getRequest.onsuccess = () => callback(store, { id, ...getRequest.result });
     };
@@ -148,7 +149,7 @@ db.objectStore((store, result = {}) => {
 window.addEventListener(
   "beforeunload",
   (event) => {
-    if (we.isDisabled() || !we.getText().trim()) {
+    if (we.isDisabled() || !we.getText().trim() || document.querySelector("#doc").innerHTML == we.getHtml()) {
       return;
     }
     event.preventDefault();
@@ -181,7 +182,7 @@ function save() {
   </div>
 </body>
 <script id="doc" type="text/template">${we.getHtml()}</script>
-<script src="https://javie5.github.io/wangEditor/index.js"></script>
+<script src="./lib/index.js"></script>
 </html>
 `;
   let name = document.querySelector(`.nav .filename`).value || "index.html";
