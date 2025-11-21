@@ -38,7 +38,7 @@ window.onload = function () {
     //点击元素事件触发元素是id为w-e-textarea-1的元素,且没换行,添加换行
     // console.log(e.target, document.querySelector("#w-e-textarea-1"), !we.getHtml().endsWith("<p><br></p>"));
     if (e.target === document.querySelector("#w-e-textarea-1") && !we.getHtml().endsWith("<p><br></p>")) {
-      we.insertBreak();
+      we.setHtml(we.getHtml() + "<p><br></p>");//we.insertBreak();
     }
   });
   docStore();
