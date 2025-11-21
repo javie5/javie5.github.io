@@ -163,6 +163,7 @@ function save() {
 <!DOCTYPE html>
 <html>
 <head>
+  <meta name="viewport" content="width=device-width,initial-scale=0.75,minimum-scale=0.5,maximum-scale=1" />
   <title>web文档</title>
   <link href="https://unpkg.com/@wangeditor/editor@5.1.23/dist/css/style.css" rel="stylesheet">
   <script src="https://unpkg.com/@wangeditor/editor@5.1.23/dist/index.js"></script>
