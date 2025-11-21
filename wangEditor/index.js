@@ -184,7 +184,7 @@ function exportDoc() {
   </div>
   <div class="doc-container">
     <div class="nav">
-      <input class='filename' placeholder="文件名"> <button onclick="save()">保存</button>
+       <button onclick="saveDoc()">保存</button> <input class='filename' placeholder="文件名"> <button onclick="exportDoc()">导出</button>
     </div>
     <div id="editor-toolbar"></div>
     <div id="editor-text-area"></div>
