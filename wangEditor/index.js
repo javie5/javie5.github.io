@@ -36,9 +36,9 @@ window.onload = function () {
   document.querySelector(`title`).innerText = document.querySelector(`.nav .filename`).value;
   document.querySelector(".doc-container").addEventListener("click", (e) => {
     //点击元素事件触发元素是id为w-e-textarea-1的元素,且没换行,添加换行
-    // console.log(e.target, document.querySelector("#w-e-textarea-1"), !we.getHtml().endsWith("<p><br></p>"));
+    // console.log(e.target, document.querySelector("#w-e-textarea-1"), we.getHtml());
     if (e.target === document.querySelector("#w-e-textarea-1") && !we.getHtml().endsWith("<p><br></p>")) {
-      we.setHtml(we.getHtml() + "<p><br></p>");//we.insertBreak();
+      we.setHtml(we.getHtml() + "<p><br></p>");
     }
   });
   docStore();
@@ -188,6 +188,7 @@ function exportDoc() {
 <!DOCTYPE html>
 <html>
 <head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=0.75,minimum-scale=0.5,maximum-scale=1" />
   <title>web文档</title>
   <link href="https://unpkg.com/@wangeditor/editor@5.1.23/dist/css/style.css" rel="stylesheet">
