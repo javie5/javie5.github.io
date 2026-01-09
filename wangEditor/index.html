@@ -15,13 +15,15 @@
 
 <body class="doc">
   <div class='doc-store'>
-    <button onclick="docAdd()">添加</button>
-    <button onclick="docSave('手动保存')">保存</button> <input class='filename' placeholder="文件名">
-    <button onclick="docExport()">导出</button>
+    <div class='doc-achor'></div>
+    <div class='doc-history'></div>
+    <div class='doc-list'></div>
   </div>
   <div class="doc-container">
-    <div class="nav">
-       <button onclick="saveDoc()">保存</button> <input class='filename' placeholder="文件名"> <button onclick="exportDoc()">导出</button>
+    <div class="nav"> 
+      <button onclick="docAdd()">添加</button>
+      <button onclick="docSave('手动保存')">保存</button> <input class='filename' placeholder="文件名">
+      <button onclick="docExport()">导出</button>
     </div>
     <div id="editor-toolbar"></div>
     <div id="editor-text-area"></div>
