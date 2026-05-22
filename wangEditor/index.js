@@ -264,6 +264,9 @@ function docExport() {
       <button onclick="docSave('手动保存')">保存</button> 
       <input class='filename' placeholder="文件名"> 
       <button onclick="docExport()">导出</button>
+      <button onclick="exportMarkdown()">导出MD</button>
+      <button onclick="importMarkdown()">导入MD</button>
+      <button onclick="copyMarkdown()">复制MD</button>
     </div>
     <div id="editor-toolbar"></div>
     <div id="editor-text-area"></div>
@@ -273,6 +276,50 @@ function docExport() {
 <script id="doc" type="text/template">${we.getHtml()}</script>
 <script src="https://javie5.github.io/wangEditor/index.js"></script>
 </html>
+<!--
+🤖 AI 协作协议
+
+【文档格式说明】
+- 本文件是一个自包含的 HTML 文档
+- 实际文档内容存储在 <script id="doc" type="text/template"> 标签内
+- 文档内容是类似HTML格式的内容;（wangeditor插件实例输出的内容:wangEditor.createEditor().getHtml()）
+
+【AI 任务】
+1. 解析 <script id="doc"...> 标签内的内容
+2. 理解其中的内容
+3. 根据用户对话要求修改内容
+4. 用户要求输出文档时保持完整HTML文件结构(依据用户对话上传的html内容格式)
+5. 只替换 <script id="doc"...> 标签内的内容，其余不变
+
+【输出要求】
+- 返回完整的.html文件,文件名默认保持原名
+- 修改的文档内容依然符合wangeditor插件格式要求;通过wangEditor.setHtml()能正常回显
+- 如果不能解析出文档内容;输出问题,原因
+
+【文档功能说明(文档编辑场景ai不用调整具体业务逻辑,只用于辅助理解用户诉求)】
+- ./lib/index.js:本地开发时的业务代码
+- https://javie5.github.io/wangEditor/index.js:部署到github时./lib/index.js对应的文件
+- 当前文档业务核心功能在index.js实现;
+- index.js内docExport函数已实现了文档导出功能;we为wangEditor插件实例()
+  function docExport() {
+    let html = \`...省略的文档布局内容
+    <script id="doc" type="text/template">\${we.getHtml()}</script>
+    <script src="https://javie5.github.io/wangEditor/index.js"></script>
+    </html>
+    \`;
+    let name = document.querySelector(`.nav .filename`).value || "index.html";
+    !name.endsWith(".html") && (name += ".html");
+    name = prompt("保存文档", name);
+    if (!name) {
+      return;
+    }
+    var url = URL.createObjectURL(new Blob([html]));
+    var a = document.createElement("a");
+    a.href = url;
+    a.setAttribute("download", name);
+    a.click();
+  }
+-->
 `;
   let name = document.querySelector(`.nav .filename`).value || "index.html";
   !name.endsWith(".html") && (name += ".html");
@@ -304,4 +351,112 @@ function docRemove(id) {
       // console.log("删除文档", result, store);
       getDocs(); //db.getId() == id ? (location.search = "") :
     });
+}
+// ==================== Markdown 支持（新增） ====================
+let turndownSvc = null;
+
+function getTurndown() {
+  if (!turndownSvc) {
+    turndownSvc = new TurndownService({
+      headingStyle: 'atx',
+      codeBlockStyle: 'fenced',
+      bulletListMarker: '-',
+      emDelimiter: '*'
+    });
+    // 自定义表格转换规则（Turndown 默认不支持表格）
+    turndownSvc.addRule('table', {
+      filter: 'table',
+      replacement: function(content, node) {
+        let md = '\n';
+        const rows = node.querySelectorAll('tr');
+        rows.forEach((row, rowIdx) => {
+          const cells = row.querySelectorAll('th, td');
+          const cellContents = Array.from(cells).map(cell => {
+            return cell.innerText.trim().replace(/\|/g, '\\|');
+          });
+          md += '| ' + cellContents.join(' | ') + ' |\n';
+          if (rowIdx === 0 && cells.length) {
+            md += '|' + cellContents.map(() => ' --- ').join('|') + '|\n';
+          }
+        });
+        return md + '\n';
+      }
+    });
+  }
+  return turndownSvc;
+}
+
+/**
+ * 将当前编辑器内容转换为 Markdown
+ */
+function getMarkdownFromEditor() {
+  const html = we.getHtml();
+  const turndown = getTurndown();
+  let md = turndown.turndown(html);
+  // 清理多余空行
+  md = md.replace(/\n{3,}/g, '\n\n').trim();
+  return md;
+}
+
+/**
+ * 导出为 .md 文件
+ */
+function exportMarkdown() {
+  const md = getMarkdownFromEditor();
+  const name = document.querySelector('.nav .filename').value || 'document';
+  const fileName = name.replace(/\.html?$/i, '') + '.md';
+  const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * 导入 .md 文件，转换为 HTML 并加载到编辑器
+ */
+function importMarkdown() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.md,.markdown,.txt';
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const mdContent = ev.target.result;
+      if (typeof marked !== 'undefined') {
+        // marked 配置：支持 GFM 表格、换行等
+        marked.setOptions({ breaks: true, gfm: true });
+        // marked.parse 返回 Promise (异步)
+        const htmlPromise = marked.parse(mdContent);
+        Promise.resolve(htmlPromise).then(html => {
+          we.setHtml(html);
+          docSave('从 Markdown 导入');
+          alert('✅ 导入成功');
+        }).catch(err => {
+          alert('转换失败：' + err.message);
+        });
+      } else {
+        alert('Markdown 解析库未加载，请刷新页面重试');
+      }
+    };
+    reader.readAsText(file, 'UTF-8');
+  };
+  input.click();
+}
+
+/**
+ * 复制 Markdown 到剪贴板（方便与 AI 交互）
+ */
+async function copyMarkdown() {
+  const md = getMarkdownFromEditor();
+  try {
+    await navigator.clipboard.writeText(md);
+    alert('✅ 已复制 Markdown 格式内容到剪贴板');
+  } catch (err) {
+    alert('复制失败，请手动复制');
+  }
 }
