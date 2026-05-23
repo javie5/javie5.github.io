@@ -307,7 +307,7 @@ function docExport() {
     <script src="https://javie5.github.io/wangEditor/index.js"></script>
     </html>
     \`;
-    let name = document.querySelector(`.nav .filename`).value || "index.html";
+    let name = document.querySelector(`.nav.filename`).value || "index.html";
     !name.endsWith(".html") && (name += ".html");
     name = prompt("保存文档", name);
     if (!name) {
@@ -358,28 +358,28 @@ let turndownSvc = null;
 function getTurndown() {
   if (!turndownSvc) {
     turndownSvc = new TurndownService({
-      headingStyle: 'atx',
-      codeBlockStyle: 'fenced',
-      bulletListMarker: '-',
-      emDelimiter: '*'
+      headingStyle: "atx",
+      codeBlockStyle: "fenced",
+      bulletListMarker: "-",
+      emDelimiter: "*"
     });
     // 自定义表格转换规则（Turndown 默认不支持表格）
-    turndownSvc.addRule('table', {
-      filter: 'table',
-      replacement: function(content, node) {
-        let md = '\n';
-        const rows = node.querySelectorAll('tr');
+    turndownSvc.addRule("table", {
+      filter: "table",
+      replacement: function (content, node) {
+        let md = "\n";
+        const rows = node.querySelectorAll("tr");
         rows.forEach((row, rowIdx) => {
-          const cells = row.querySelectorAll('th, td');
-          const cellContents = Array.from(cells).map(cell => {
-            return cell.innerText.trim().replace(/\|/g, '\\|');
+          const cells = row.querySelectorAll("th, td");
+          const cellContents = Array.from(cells).map((cell) => {
+            return cell.innerText.trim().replace(/\|/g, "\\|");
           });
-          md += '| ' + cellContents.join(' | ') + ' |\n';
+          md += "| " + cellContents.join(" | ") + " |\n";
           if (rowIdx === 0 && cells.length) {
-            md += '|' + cellContents.map(() => ' --- ').join('|') + '|\n';
+            md += "|" + cellContents.map(() => " --- ").join("|") + "|\n";
           }
         });
-        return md + '\n';
+        return md + "\n";
       }
     });
   }
@@ -394,7 +394,7 @@ function getMarkdownFromEditor() {
   const turndown = getTurndown();
   let md = turndown.turndown(html);
   // 清理多余空行
-  md = md.replace(/\n{3,}/g, '\n\n').trim();
+  md = md.replace(/\n{3,}/g, "\n\n").trim();
   return md;
 }
 
@@ -403,11 +403,11 @@ function getMarkdownFromEditor() {
  */
 function exportMarkdown() {
   const md = getMarkdownFromEditor();
-  const name = document.querySelector('.nav .filename').value || 'document';
-  const fileName = name.replace(/\.html?$/i, '') + '.md';
-  const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+  const name = document.querySelector(".nav .filename").value || "document";
+  const fileName = name.replace(/\.html?$/i, "") + ".md";
+  const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  const a = document.createElement("a");
   a.href = url;
   a.download = fileName;
   a.click();
@@ -418,32 +418,28 @@ function exportMarkdown() {
  * 导入 .md 文件，转换为 HTML 并加载到编辑器
  */
 function importMarkdown() {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.md,.markdown,.txt';
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".md,.markdown,.txt";
   input.onchange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
       const mdContent = ev.target.result;
-      if (typeof marked !== 'undefined') {
+      if (typeof marked !== "undefined") {
         // marked 配置：支持 GFM 表格、换行等
         marked.setOptions({ breaks: true, gfm: true });
         // marked.parse 返回 Promise (异步)
-        const htmlPromise = marked.parse(mdContent);
-        Promise.resolve(htmlPromise).then(html => {
-          we.setHtml(html);
-          docSave('从 Markdown 导入');
-          alert('✅ 导入成功');
-        }).catch(err => {
-          alert('转换失败：' + err.message);
-        });
+        const html = marked.parse(mdContent);
+        we.setHtml(html);
+        docSave("从 Markdown 导入");
+        alert("✅ 导入成功");
       } else {
-        alert('Markdown 解析库未加载，请刷新页面重试');
+        alert("Markdown 解析库未加载，请刷新页面重试");
       }
     };
-    reader.readAsText(file, 'UTF-8');
+    reader.readAsText(file, "UTF-8");
   };
   input.click();
 }
@@ -455,8 +451,129 @@ async function copyMarkdown() {
   const md = getMarkdownFromEditor();
   try {
     await navigator.clipboard.writeText(md);
-    alert('✅ 已复制 Markdown 格式内容到剪贴板');
+    alert("✅ 已复制 Markdown 格式内容到剪贴板");
   } catch (err) {
-    alert('复制失败，请手动复制');
+    alert("复制失败，请手动复制");
   }
 }
+// ==================== 新增：Ctrl+S 保存 + 拖拽打开 .html/.md 文件 ====================
+
+// ========== Ctrl+S 保存 ==========
+window.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+    e.preventDefault();
+    docSave("快捷键 Ctrl+S");
+  }
+});
+
+// ========== 拖拽打开文件（支持 .html 和 .md，使用自定义 select 弹窗选择模式） ==========
+const dropZone = document.body;
+dropZone.addEventListener("dragover", (e) => e.preventDefault());
+dropZone.addEventListener("dragleave", (e) => e.preventDefault());
+dropZone.addEventListener("drop", (e) => {
+  e.preventDefault();
+  const files = e.dataTransfer.files;
+  if (files.length === 0) return;
+  const file = files[0];
+  const fileName = file.name.toLowerCase();
+
+  const isHtml = fileName.endsWith(".html");
+  const isMd = fileName.endsWith(".md") || fileName.endsWith(".markdown") || fileName.endsWith(".txt");
+
+  if (!isHtml && !isMd) {
+    alert("请拖入 .html 或文本类型文件(.md,.txt等类型)");
+    return;
+  }
+
+  // 动态生成选择模式的自定义弹框
+  const modal = document.createElement("div");
+  modal.style.cssText = `
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
+    z-index: 10000;
+  `;
+  const panel = document.createElement("div");
+  panel.style.cssText = `
+    background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    min-width: 260px; text-align: center; font-family: system-ui, sans-serif;
+  `;
+  panel.innerHTML = `
+    <div style="margin-bottom: 16px; font-weight: bold;">选择导入模式</div>
+    <select id="import-mode-select" style="width: 100%; padding: 8px; margin-bottom: 20px; border-radius: 4px; border: 1px solid #ccc;">
+      <option value="overwrite">覆盖当前内容</option>
+      <option value="append">追加到当前内容末尾</option>
+    </select>
+    <div>
+      <button id="import-confirm-btn" style="margin-right: 12px; padding: 6px 16px; cursor: pointer;">确认</button>
+      <button id="import-cancel-btn" style="padding: 6px 16px; cursor: pointer;">取消</button>
+    </div>
+  `;
+  modal.appendChild(panel);
+  document.body.appendChild(modal);
+
+  // 清理弹框的函数
+  const closeModal = () => modal.remove();
+
+  // 确认按钮逻辑
+  const confirmBtn = panel.querySelector("#import-confirm-btn");
+  const cancelBtn = panel.querySelector("#import-cancel-btn");
+  const modeSelect = panel.querySelector("#import-mode-select");
+
+  const handleConfirm = () => {
+    const mode = modeSelect.value; // 'overwrite' 或 'append'
+    const isOverwrite = mode === "overwrite";
+    closeModal();
+
+    // 读取文件并处理
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const content = ev.target.result;
+      const processContent = (newHtml) => {
+        const currentHtml = window.we.getHtml();
+        let finalHtml;
+        if (isOverwrite) {
+          finalHtml = newHtml;
+        } else {
+          // 追加：确保原内容末尾有换行分隔
+          const separator = currentHtml.trim().endsWith("<p><br></p>") ? "" : "<p><br></p>";
+          finalHtml = currentHtml + separator + newHtml;
+        }
+        window.we.setHtml(finalHtml);
+        const docScript = document.getElementById("doc");
+        if (docScript) docScript.innerHTML = finalHtml;
+        if (typeof docSave === "function") docSave(`拖拽导入 (${isOverwrite ? "覆盖" : "追加"})`);
+        alert(`✅ 已${isOverwrite ? "覆盖" : "追加"}文档：${file.name}`);
+      };
+
+      if (isHtml) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(content, "text/html");
+        const templateScript = doc.querySelector('script[id="doc"][type="text/template"]');
+        let newHtml = "";
+        if (templateScript && templateScript.innerHTML) {
+          newHtml = templateScript.innerHTML;
+        } else {
+          newHtml = doc.body ? doc.body.innerHTML : "<p>无法解析文档内容</p>";
+        }
+        processContent(newHtml);
+      } else if (isMd) {
+        if (typeof marked === "undefined") {
+          alert("Markdown 解析库未加载，请刷新页面重试");
+          return;
+        }
+        marked.setOptions({ breaks: true, gfm: true });
+        let html = marked.parse(content);
+        processContent(html);
+      }
+    };
+    reader.onerror = () => alert("读取文件失败");
+    reader.readAsText(file, "UTF-8");
+  };
+
+  confirmBtn.addEventListener("click", handleConfirm);
+  cancelBtn.addEventListener("click", closeModal);
+  // 点击遮罩层也可关闭
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) closeModal();
+  });
+});
