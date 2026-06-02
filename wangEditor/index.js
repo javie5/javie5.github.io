@@ -307,7 +307,7 @@ function docExport() {
     <script src="https://javie5.github.io/wangEditor/index.js"></script>
     </html>
     \`;
-    let name = document.querySelector(`.nav.filename`).value || "index.html";
+    let name = document.querySelector(".nav .filename").value || "index.html";
     !name.endsWith(".html") && (name += ".html");
     name = prompt("保存文档", name);
     if (!name) {
@@ -321,7 +321,7 @@ function docExport() {
   }
 -->
 `;
-  let name = document.querySelector(`.nav .filename`).value || "index.html";
+  let name = document.querySelector(".nav .filename").value || "index.html";
   !name.endsWith(".html") && (name += ".html");
   name = prompt("保存文档", name);
   if (!name) {
