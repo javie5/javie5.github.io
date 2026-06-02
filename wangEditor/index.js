@@ -250,6 +250,9 @@ function docExport() {
   <title>web文档</title>
   <link href="https://unpkg.com/@wangeditor/editor@5.1.23/dist/css/style.css" rel="stylesheet">
   <script src="https://unpkg.com/@wangeditor/editor@5.1.23/dist/index.js"></script>
+  <!-- Markdown 转换库 -->
+  <script src="https://unpkg.com/marked@11.1.1/marked.min.js"></script>
+  <script src="https://unpkg.com/turndown@7.1.2/dist/turndown.js"></script>
   <style></style>
 </head>
 <body class="doc">
