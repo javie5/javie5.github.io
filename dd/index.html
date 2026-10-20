@@ -5,10 +5,32 @@
 <body class="doc">
  <div>钉钉页面测试1</div> 
 <script src='https://g.alicdn.com/code/npm/@ali/dingtalk-h5-remote-debug/0.1.3/index.js'></script>
+<script src="https://g.alicdn.com/dingding/dingtalk-jsapi/3.0.12/dingtalk.open.js"></script>
+<script src="http://localhost:4000/public/test.js"></script>
  <script >
    initDingH5RemoteDebug();
  </script>
-
+<script>
+  dd.ready(() => {
+    dd.requestAuthCode({
+      corpId: 'your_corp_id', // 企业ID
+      clientId: 'your_client_id', // 应用Client ID
+      onSuccess: (result) => {
+        // 成功获取免登授权码
+        console.log('authCode:', result.code);
+        // 将此code发送到你的后端服务器
+        fetch('/api/dingtalk/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ authCode: result.code })
+        });
+      },
+      onFail: (err) => {
+        console.error('获取免登授权码失败:', err);
+      }
+    });
+  });
+</script>
 
 </body>
 </html>
