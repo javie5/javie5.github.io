@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PeerJS 点对点消息</title>
+
+  <!-- PeerJS 库（jsdelivr CDN，国内访问较快） -->
+  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #f5f7fa;
+      color: #1f2937;
+    }
+    main {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    h1 { font-size: 24px; margin-bottom: 16px; }
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    }
+    label {
+      font-size: 14px;
+      font-weight: 600;
+      display: block;
+      margin-bottom: 6px;
+      margin-top: 12px;
+    }
+    label:first-child { margin-top: 0; }
+    input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+    }
+    input:focus { border-color: #2563eb; }
+    .row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .row input { flex: 1; }
+    button {
+      padding: 10px 16px;
+      border: none;
+      border-radius: 8px;
+      background: #2563eb;
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    button:hover { background: #1d4ed8; }
+    button.secondary { background: #6b7280; }
+    button.secondary:hover { background: #4b5563; }
+    button.small { padding: 6px 12px; font-size: 13px; }
+    ul { padding-left: 0; list-style: none; margin: 0; }
+    li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #f9fafb;
+      padding: 8px 10px;
+      border-radius: 8px;
+      margin-bottom: 6px;
+      font-size: 13px;
+    }
+    .messages {
+      height: 280px;
+      overflow-y: auto;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+    .msg {
+      background: white;
+      border: 1px solid #e5e7eb;
+      padding: 8px 10px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      font-size: 14px;
+      max-width: 80%;
+    }
+    .msg.me {
+      background: #eff6ff;
+      border-color: #bfdbfe;
+      margin-left: auto;
+    }
+    .msg .meta {
+      font-size: 12px;
+      color: #6b7280;
+      margin-bottom: 4px;
+    }
+    .msg .text { word-break: break-all; }
+    #status {
+      font-size: 14px;
+      font-weight: 600;
+      margin-top: 10px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: #f3f4f6;
+    }
+    #status.ok { background: #d1fae5; color: #065f46; }
+    #status.err { background: #fee2e2; color: #991b1b; }
+    small { color: #6b7280; font-size: 12px; }
+    .tip {
+      margin-top: 8px;
+      padding: 10px 12px;
+      background: #eff6ff;
+      border-left: 3px solid #2563eb;
+      border-radius: 4px;
+      font-size: 13px;
+      color: #1e40af;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>🔗 PeerJS 点对点消息</h1>
+
+    <!-- 我的 ID -->
+    <section class="card">
+      <label>我的 Peer ID</label>
+      <div class="row">
+        <input id="myId" readonly placeholder="正在生成..." />
+        <button id="copyId">复制 ID</button>
+        <button id="copyLink" class="secondary">复制链接</button>
+        <button id="newId" class="secondary">换新 ID</button>
+      </div>
+      <small>把 ID 或链接发给对方，对方填入后即可连接</small>
+    </section>
+
+    <!-- 连接对方 -->
+    <section class="card">
+      <label>对方 Peer ID</label>
+      <div class="row">
+        <input id="targetPeer" placeholder="粘贴对方 ID，回车连接" />
+        <button id="connectBtn">连接</button>
+      </div>
+
+      <label>历史联系人（点击填入）</label>
+      <ul id="contacts"></ul>
+    </section>
+
+    <!-- 聊天 -->
+    <section class="card">
+      <label>消息（当前对话：<span id="chatWith">未选择</span>）</label>
+      <div id="messages" class="messages"></div>
+      <div class="row">
+        <input id="msgInput" placeholder="输入消息，按 Enter 发送" />
+        <button id="sendBtn">发送</button>
+      </div>
+      <div id="status">初始化中...</div>
+    </section>
+
+    <div class="tip">
+      📌 双标签页测试：本页面已启用「每个标签页独立 ID」模式（sessionStorage），
+      同一浏览器开两个标签页会各自生成不同 ID，不会冲突。
+    </div>
+  </main>
+
+  <script>
+    // ═══════════════════════════════════════════
+    // 配置区
+    // ═══════════════════════════════════════════
+
+    // PeerJS 服务配置：
+    // - 留空 {} 使用 PeerJS 官方免费云（默认，测试用）
+    // - 国内服务器自建示例：
+    //   const PEER_SERVER = {
+    //     host: "peerjs.yourdomain.com",
+    //     port: 443,
+    //     path: "/peerjs",
+    //     secure: true,
+    //     key: "peerjs"
+    //   };
+    // - 本地自建测试：
+    //   const PEER_SERVER = { host: "127.0.0.1", port: 9000, path: "/peerjs", key: "peerjs" };
+    const PEER_SERVER = {};
+
+    // 国内 STUN，提升 NAT 穿透成功率
+    const ICE_SERVERS = {
+      iceServers: [
+        { urls: "stun:stun.qq.com:3478" },
+        { urls: "stun:stun.aliyun.com:3478" },
+        { urls: "stun:stun.l.google.com:19302" }
+      ]
+    };
+
+    // ID 存储开关：
+    // false → sessionStorage（每个标签页独立 ID，适合双标签测试）
+    // true  → localStorage（刷新/重开浏览器 ID 不变，适合单页面使用）
+    const PERSIST_MY_ID_IN_LOCALSTORAGE = false;
+
+    // ═══════════════════════════════════════════
+    // 存储工具
+    // ═══════════════════════════════════════════
+    const KEY_MY_ID = "peerjs:myId";
+    const KEY_CONTACTS = "peerjs:contacts";
+    const KEY_MSG_PREFIX = "peerjs:msgs:";
+
+    const myStore = PERSIST_MY_ID_IN_LOCALSTORAGE ? localStorage : sessionStorage;
+
+    function genId() {
+      return "p2p-" + Math.random().toString(36).slice(2, 10);
+    }
+
+    function getContacts() {
+      try { return JSON.parse(localStorage.getItem(KEY_CONTACTS) || "[]"); }
+      catch { return []; }
+    }
+    function saveContacts(list) {
+      localStorage.setItem(KEY_CONTACTS, JSON.stringify(list.slice(0, 50)));
+    }
+    function addContact(id) {
+      if (!id || id === myPeerId) return;
+      const list = getContacts();
+      const i = list.indexOf(id);
+      if (i > -1) list.splice(i, 1);
+      list.unshift(id);
+      saveContacts(list);
+      renderContacts();
+    }
+
+    function getMsgs(peerId) {
+      try { return JSON.parse(localStorage.getItem(KEY_MSG_PREFIX + peerId) || "[]"); }
+      catch { return []; }
+    }
+    function saveMsg(peerId, msg) {
+      const list = getMsgs(peerId);
+      list.push(msg);
+      localStorage.setItem(KEY_MSG_PREFIX + peerId, JSON.stringify(list.slice(-200)));
+    }
+
+    // ═══════════════════════════════════════════
+    // DOM 与 UI
+    // ═══════════════════════════════════════════
+    const myIdEl = document.getElementById("myId");
+    const targetPeerEl = document.getElementById("targetPeer");
+    const msgInputEl = document.getElementById("msgInput");
+    const messagesEl = document.getElementById("messages");
+    const contactsEl = document.getElementById("contacts");
+    const statusEl = document.getElementById("status");
+    const chatWithEl = document.getElementById("chatWith");
+
+    function setStatus(text, type = "") {
+      statusEl.textContent = "状态：" + text;
+      statusEl.className = type;
+    }
+
+    function renderContacts() {
+      const list = getContacts();
+      contactsEl.innerHTML = "";
+      if (!list.length) {
+        const li = document.createElement("li");
+        li.textContent = "暂无历史联系人";
+        contactsEl.appendChild(li);
+        return;
+      }
+      list.forEach((id) => {
+        const li = document.createElement("li");
+        const span = document.createElement("span");
+        span.textContent = id;
+        const btn = document.createElement("button");
+        btn.textContent = "填入";
+        btn.className = "small";
+        btn.onclick = () => {
+          targetPeerEl.value = id;
+          switchChat(id);
+        };
+        li.appendChild(span);
+        li.appendChild(btn);
+        contactsEl.appendChild(li);
+      });
+    }
+
+    function appendMsg(from, text) {
+      const div = document.createElement("div");
+      div.className = "msg" + (from === "我" ? " me" : "");
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      meta.textContent = from + " · " + new Date().toLocaleTimeString();
+      const body = document.createElement("div");
+      body.className = "text";
+      body.textContent = text;
+      div.appendChild(meta);
+      div.appendChild(body);
+      messagesEl.appendChild(div);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function switchChat(peerId) {
+      chatWithEl.textContent = peerId || "未选择";
+      messagesEl.innerHTML = "";
+      if (!peerId) return;
+      getMsgs(peerId).forEach((m) => {
+        appendMsg(m.dir === "out" ? "我" : "对方", m.text);
+      });
+      addContact(peerId);
+    }
+
+    async function copyText(text) {
+      try {
+        await navigator.clipboard.writeText(text);
+        setStatus("已复制到剪贴板", "ok");
+      } catch {
+        prompt("请手动复制：", text);
+      }
+    }
+
+    // ═══════════════════════════════════════════
+    // PeerJS 逻辑（含 ID 冲突自动重试）
+    // ═══════════════════════════════════════════
+    let peer = null;
+    let myPeerId = myStore.getItem(KEY_MY_ID) || genId();
+    const connections = new Map(); // peerId -> DataConnection
+
+    function createPeer(id, retryCount = 0) {
+      if (retryCount > 5) {
+        setStatus("多次换 ID 仍失败，请检查网络或服务配置", "err");
+        return;
+      }
+
+      const p = new Peer(id, {
+        ...PEER_SERVER,
+        debug: 2,
+        config: ICE_SERVERS
+      });
+
+      p.on("open", (finalId) => {
+        myPeerId = finalId;
+        myStore.setItem(KEY_MY_ID, finalId);
+        myIdEl.value = finalId;
+        setStatus("已就绪，我的 ID：" + finalId, "ok");
+      });
+
+      // 对方主动连我
+      p.on("connection", (conn) => {
+        bindConn(conn);
+      });
+
+      p.on("disconnected", () => {
+        setStatus("与服务器断开，正在重连...");
+        try { p.reconnect(); } catch { /* ignore */ }
+      });
+
+      p.on("error", (err) => {
+        if (err.type === "unavailable-id") {
+          // ID 被占用 → 换新 ID 重试
+          setStatus("ID 被占用，自动更换新 ID...（第 " + (retryCount + 1) + " 次）", "err");
+          try { p.destroy(); } catch { /* ignore */ }
+          const newId = genId();
+          myStore.setItem(KEY_MY_ID, newId);
+          myPeerId = newId;
+          createPeer(newId, retryCount + 1);
+        } else if (err.type === "peer-unavailable") {
+          setStatus("对方不在线或 ID 不存在", "err");
+        } else {
+          setStatus("错误：" + (err.type || "") + " " + (err.message || ""), "err");
+        }
+      });
+
+      return p;
+    }
+
+    function bindConn(conn) {
+      connections.set(conn.peer, conn);
+
+      conn.on("open", () => {
+        addContact(conn.peer);
+        setStatus("已连接：" + conn.peer, "ok");
+        if (targetPeerEl.value.trim() === conn.peer) {
+          chatWithEl.textContent = conn.peer;
+        }
+      });
+
+      conn.on("data", (data) => {
+        const text = typeof data === "string" ? data : JSON.stringify(data);
+        saveMsg(conn.peer, { dir: "in", text, ts: Date.now() });
+        if (chatWithEl.textContent === conn.peer) {
+          appendMsg("对方", text);
+        } else {
+          setStatus("💬 收到新消息来自：" + conn.peer, "ok");
+        }
+      });
+
+      conn.on("close", () => {
+        connections.delete(conn.peer);
+        setStatus("连接已断开：" + conn.peer);
+      });
+
+      conn.on("error", (err) => {
+        setStatus("连接错误：" + (err.message || err), "err");
+      });
+    }
+
+    function ensureConnection(remoteId) {
+      const id = remoteId.trim();
+      if (!id) throw new Error("请先填写对方 ID");
+      if (id === myPeerId) throw new Error("不能连接自己");
+
+      addContact(id);
+
+      let conn = connections.get(id);
+      if (!conn) {
+        conn = peer.connect(id, { reliable: true });
+        bindConn(conn);
+      }
+      return conn;
+    }
+
+    function sendMessage() {
+      const id = targetPeerEl.value.trim();
+      const text = msgInputEl.value.trim();
+      if (!id) { setStatus("请先填写对方 ID", "err"); return; }
+      if (!text) return;
+
+      try {
+        const conn = ensureConnection(id);
+        if (conn.open) {
+          doSend(conn, text);
+        } else {
+          setStatus("正在连接对方，连接成功后自动发送...");
+          conn.on("open", () => doSend(conn, text));
+        }
+      } catch (err) {
+        setStatus(err.message, "err");
+      }
+    }
+
+    function doSend(conn, text) {
+      conn.send(text);
+      saveMsg(conn.peer, { dir: "out", text, ts: Date.now() });
+      appendMsg("我", text);
+      msgInputEl.value = "";
+    }
+
+    // ═══════════════════════════════════════════
+    // 页面事件绑定
+    // ═══════════════════════════════════════════
+    document.getElementById("sendBtn").onclick = sendMessage;
+
+    msgInputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") sendMessage();
+    });
+
+    document.getElementById("connectBtn").onclick = () => {
+      const id = targetPeerEl.value.trim();
+      if (!id) { setStatus("请填写对方 ID", "err"); return; }
+      switchChat(id);
+      try {
+        ensureConnection(id);
+        setStatus("正在连接：" + id);
+      } catch (err) {
+        setStatus(err.message, "err");
+      }
+    };
+
+    targetPeerEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") document.getElementById("connectBtn").click();
+    });
+
+    document.getElementById("copyId").onclick = () => copyText(myPeerId);
+
+    document.getElementById("copyLink").onclick = () => {
+      const base = location.href.split("?")[0];
+      copyText(base + "?peer=" + encodeURIComponent(myPeerId));
+    };
+
+    document.getElementById("newId").onclick = () => {
+      if (peer) { try { peer.destroy(); } catch { /* ignore */ } }
+      connections.clear();
+      const newId = genId();
+      myStore.setItem(KEY_MY_ID, newId);
+      myPeerId = newId;
+      createPeer(newId);
+    };
+
+    // 页面关闭时释放连接
+    window.addEventListener("beforeunload", () => {
+      try { peer?.destroy(); } catch { /* ignore */ }
+    });
+
+    // ═══════════════════════════════════════════
+    // 启动
+    // ═══════════════════════════════════════════
+    myIdEl.value = myPeerId + "（连接中...）";
+    renderContacts();
+
+    // 支持 ?peer=xxx 链接自动填入对方 ID
+    const urlPeerId = new URLSearchParams(location.search).get("peer");
+    if (urlPeerId) {
+      targetPeerEl.value = urlPeerId;
+      switchChat(urlPeerId);
+    }
+
+    peer = createPeer(myPeerId);
+  </script>
+</body>
+</html>
