@@ -379,7 +379,26 @@
 
     function bindConn(conn) {
       connections.set(conn.peer, conn);
-
+  // ⭐ 新增：ICE 状态诊断
+  if (conn.peerConnection) {
+    conn.peerConnection.oniceconnectionstatechange = () => {
+      const s = conn.peerConnection.iceConnectionState;
+      console.log("ICE 状态 [" + conn.peer + "]:", s);
+      if (s === "failed") {
+        setStatus("ICE 连接失败（打洞不通），当前网络可能是 AP 隔离或对称 NAT，需要 TURN 服务器", "err");
+      } else if (s === "disconnected") {
+        setStatus("ICE 断开，可能自动恢复...", "err");
+      } else if (s === "connected" || s === "completed") {
+        console.log("✅ P2P 已打通");
+      }
+    };
+    conn.peerConnection.onicecandidate = (e) => {
+      if (e.candidate) {
+        console.log("候选地址:", e.candidate.candidate.split(" ")[4],
+                    "类型:", e.candidate.candidate.split(" ")[7]);
+      }
+    };
+  }
       conn.on("open", () => {
         addContact(conn.peer);
         setStatus("已连接：" + conn.peer, "ok");
